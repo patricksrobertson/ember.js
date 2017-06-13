@@ -1,0 +1,147 @@
+import { Controller } from 'ember-runtime';
+import { run } from 'ember-metal';
+import { Component } from 'ember-glimmer';
+import { jQuery } from 'ember-views';
+import { moduleFor, ApplicationTestCase } from 'internal-test-helpers';
+
+let App, appInstance;
+
+moduleFor('Application Lifecycle - Component Context', class extends ApplicationTestCase {
+  ['@test Components with a block should have the proper content when a template is provided'](assert) {
+    this.addTemplate('application', '<div id=\'wrapper\'>{{#my-component}}{{text}}{{/my-component}}</div>');
+
+    this.add('controller:application', Controller.extend({
+      'text': 'outer'
+    }));
+    this.addComponent('my-component', { ComponentClass: Component.extend({
+      text: 'inner'
+    }), template: '{{text}}-{{yield}}' });
+
+    this.visit('/').then(() => {
+      assert.equal(jQuery('#wrapper').text(), 'inner-outer', 'The component is composed correctly');
+    });
+  }
+
+  ['@test Components with a block should yield the proper content without a template provided'](assert) {
+    this.addTemplate('application', '<div id=\'wrapper\'>{{#my-component}}{{text}}{{/my-component}}</div>');
+
+    this.add('controller:application', Controller.extend({
+      'text': 'outer'
+    }));
+    this.addComponent('my-component', { ComponentClass: Component.extend({
+      text: 'inner'
+    }) });
+
+    this.visit('/').then(() => {
+      assert.equal(jQuery('#wrapper').text(), 'outer', 'The component is composed correctly');
+    });
+  }
+  ['@test Components without a block should have the proper content when a template is provided'](assert) {
+    this.addTemplate('application', '<div id=\'wrapper\'>{{my-component}}</div>');
+
+    this.add('controller:application', Controller.extend({
+      'text': 'outer'
+    }));
+    this.addComponent('my-component', { ComponentClass: Component.extend({
+      text: 'inner'
+    }), template: '{{text}}' });
+
+    this.visit('/').then(() => {
+      assert.equal(jQuery('#wrapper').text(), 'inner', 'The component is composed correctly');
+    });
+  }
+
+  ['@test Components without a block should have the proper content'](assert) {
+    this.addTemplate('application', '<div id=\'wrapper\'>{{my-component}}</div>');
+
+    this.add('controller:application', Controller.extend({
+      'text': 'outer'
+    }));
+    this.addComponent('my-component', { ComponentClass: Component.extend({
+      didInsertElement() {
+        this.$().html('Some text inserted by jQuery');
+      }
+    }) });
+
+    this.visit('/').then(() => {
+      assert.equal(jQuery('#wrapper').text(), 'Some text inserted by jQuery', 'The component is composed correctly');
+    });
+  }
+
+  ['@test properties of a component without a template should not collide with internal structures [DEPRECATED]'](assert) {
+    this.addTemplate('application', '<div id=\'wrapper\'>{{my-component data=foo}}</div>');
+
+    this.add('controller:application', Controller.extend({
+      'text': 'outer',
+      'foo': 'Some text inserted by jQuery'
+    }));
+    this.addComponent('my-component', { ComponentClass: Component.extend({
+      didInsertElement() {
+        this.$().html(this.get('data'));
+      }
+    }) });
+
+    this.visit('/').then(() => {
+      assert.equal(jQuery('#wrapper').text(), 'Some text inserted by jQuery', 'The component is composed correctly');
+    });
+  }
+
+  ['@test attrs property of a component without a template should not collide with internal structures'](assert) {
+    this.addTemplate('application', '<div id=\'wrapper\'>{{my-component attrs=foo}}</div>');
+
+    this.add('controller:application', Controller.extend({
+      'text': 'outer',
+      'foo': 'Some text inserted by jQuery'
+    }));
+    this.addComponent('my-component', { ComponentClass: Component.extend({
+      didInsertElement() {
+        // FIXME: I'm unsure if this is even the right way to access attrs
+        this.$().html(this.get('attrs.attrs.value'));
+      }
+    }) });
+
+    this.visit('/').then(() => {
+      assert.equal(jQuery('#wrapper').text(), 'Some text inserted by jQuery', 'The component is composed correctly');
+    });
+  }
+
+  ['@test Components trigger actions in the parents context when called from within a block'](assert) {
+    this.addTemplate('application', '<div id=\'wrapper\'>{{#my-component}}<a href=\'#\' id=\'fizzbuzz\' {{action \'fizzbuzz\'}}>Fizzbuzz</a>{{/my-component}}</div>');
+
+    this.add('controller:application', Controller.extend({
+      actions: {
+        fizzbuzz() {
+          ok(true, 'action triggered on parent');
+        }
+      }
+    }));
+    this.addComponent('my-component', { ComponentClass: Component.extend({}) });
+
+    this.visit('/').then(() => {
+      run(() => jQuery('#fizzbuzz', '#wrapper').click());
+    });
+  }
+
+  ['@test Components trigger actions in the components context when called from within its template'](assert) {
+    this.addTemplate('application', '<div id=\'wrapper\'>{{#my-component}}{{text}}{{/my-component}}</div>');
+
+    this.add('controller:application', Controller.extend({
+      actions: {
+        fizzbuzz() {
+          ok(false, 'action on the wrong context');
+        }
+      }
+    }));
+    this.addComponent('my-component', { ComponentClass: Component.extend({
+      actions: {
+        fizzbuzz() {
+          ok(true, 'action triggered on component');
+        }
+      }
+    }), template: '<a href=\'#\' id=\'fizzbuzz\' {{action \'fizzbuzz\'}}>Fizzbuzz</a>' });
+
+    this.visit('/').then(() => {
+      run(() => jQuery('#fizzbuzz', '#wrapper').click());
+    });
+  }
+});
