@@ -353,9 +353,11 @@ moduleFor('The {{link-to}} helper: invoking with query params', class extends Ap
 
     this.visit('/').then(() => {
       this.shouldNotBeActive(assert, '#page-link');
-    });
-
-    this.visit('/?page=5').then(() => {
+      return this.visit('/?page=5');
+    }).then(() => {
+      let router = this.appRouter;
+      assert.equal(router.get('url'), '/?page=5');
+      assert.equal(router.currentRouteName, 'index');
       this.shouldBeActive(assert, '#page-link');
     });
   }
